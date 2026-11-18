@@ -1,0 +1,8 @@
+{
+  "name": "SetuMatch",
+  "description": "Calendar-sync AI shortlisting engine connecting Year 2+ Uttar Pradesh college students, startups, and T&P cells via constraint-first matching, blind shortlisting, and Sprint-to-PPO pipelines.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
