@@ -1,97 +1,83 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
+  addWeeksIso,
   calculateNepCredits,
-  computeCalendarOverlap,
   computeSkillDistribution,
-  cosineSimilarity,
-  evaluateHardConstraints,
-  getDisplayCandidateIdentity,
-  rankCandidates,
+  evaluateStageOneConstraints,
+  getBlindSafeUniversityLabel,
+  rankStudentsForOpening,
 } from './matchmaker';
-import { DEFAULT_REQUIREMENT, INITIAL_STUDENTS, UP_UNIVERSITIES } from '../data/upSeedData';
+import { DEFAULT_OPENING, INITIAL_STUDENTS, UP_UNIVERSITIES } from '../data/upSeedData';
 
-test('calculateNepCredits maps weeks to NEP-2020 academic credits', () => {
-  assert.equal(calculateNepCredits(2), 2); // 70 hrs / 40 = 1.75 -> 2 credits
-  assert.equal(calculateNepCredits(8), 7); // 280 hrs / 40 = 7 credits
-  assert.equal(calculateNepCredits(12), 11); // 420 hrs / 40 = 10.5 -> 11 credits
+test('calculateNepCredits maps weeks to NEP-2020 credits', () => {
+  assert.equal(calculateNepCredits(4), 4);
+  assert.equal(calculateNepCredits(8), 7);
+  assert.equal(calculateNepCredits(12), 11);
   assert.equal(calculateNepCredits(0), 0);
 });
 
-test('cosineSimilarity computes exact dot-product normalization', () => {
-  assert.equal(Math.round(cosineSimilarity([1, 0, 0], [1, 0, 0]) * 100), 100);
-  assert.equal(Math.round(cosineSimilarity([1, 0], [0, 1]) * 100), 0);
-  assert.equal(cosineSimilarity([], [1, 2]), 0);
+test('addWeeksIso computes exact end date for 8-week sprint', () => {
+  assert.equal(addWeeksIso('2027-05-15', 8), '2027-07-10');
 });
 
-test('computeCalendarOverlap detects HBTU Kanpur exam conflict for early May start', () => {
-  const hbtu = UP_UNIVERSITIES.find((u) => u.id === 'hbtu-kanpur')!;
-  const priya = INITIAL_STUDENTS.find((s) => s.id === 'stu-priya')!;
-  const overlap = computeCalendarOverlap(
-    priya.availabilityStart, // 2027-05-29
-    priya.availabilityEnd,   // 2027-08-12
-    '2027-05-15',
-    '2027-08-15',
-    90,
-    hbtu
-  );
-  assert.equal(overlap.sufficientForDuration, false);
-  assert.ok(overlap.examConflictDays > 0);
-  assert.ok(overlap.examConflictNote?.includes('HBTU Kanpur'));
-});
-
-test('evaluateHardConstraints filters out unverified students when requireTnPVerified is true', () => {
+test('evaluateStageOneConstraints enforces T&P verified, availability, stipend, and PPO constraints', () => {
   const kabir = INITIAL_STUDENTS.find((s) => s.id === 'stu-kabir')!;
-  const uni = UP_UNIVERSITIES.find((u) => u.id === kabir.universityId)!;
-  const check = evaluateHardConstraints(kabir, { ...DEFAULT_REQUIREMENT, requireTnPVerified: true }, uni);
-  assert.equal(check.passed, false);
-  assert.ok(check.reasons.some((r) => r.includes('Pending T&P verification')));
+  const unverifiedCheck = evaluateStageOneConstraints(kabir, DEFAULT_OPENING);
+  assert.equal(unverifiedCheck.passed, false);
+  assert.ok(unverifiedCheck.reasons[0].includes('Pending T&P Cell verification'));
 
-  const checkRelaxed = evaluateHardConstraints(
-    kabir,
-    { ...DEFAULT_REQUIREMENT, requireTnPVerified: false, stipendMonthly: 12000 },
-    uni
+  // HBTU Priya is free May 26 -> fails May 15 start date
+  const priya = INITIAL_STUDENTS.find((s) => s.id === 'stu-priya')!;
+  const dateCheck = evaluateStageOneConstraints(priya, DEFAULT_OPENING);
+  assert.equal(dateCheck.passed, false);
+  assert.ok(dateCheck.reasons[0].includes('Availability'));
+
+  // Aarav wants PPO -> fails when ppoAvailable is false
+  const aarav = INITIAL_STUDENTS.find((s) => s.id === 'stu-aarav')!;
+  const ppoCheck = evaluateStageOneConstraints(aarav, {
+    ...DEFAULT_OPENING,
+    ppoAvailable: false,
+  });
+  assert.equal(ppoCheck.passed, false);
+  assert.ok(ppoCheck.reasons.some((r) => r.includes('PPO')));
+});
+
+test('rankStudentsForOpening updates shortlist dynamically with stipend slider', () => {
+  const lowStipend = rankStudentsForOpening(
+    INITIAL_STUDENTS,
+    { ...DEFAULT_OPENING, stipendMonthly: 4000 },
+    UP_UNIVERSITIES
   );
-  assert.equal(checkRelaxed.passed, true);
+  assert.equal(lowStipend.filter((m) => m.hardFilterPassed).length, 0);
+
+  const fairStipend = rankStudentsForOpening(
+    INITIAL_STUDENTS,
+    { ...DEFAULT_OPENING, stipendMonthly: 10000 },
+    UP_UNIVERSITIES
+  );
+  // Aarav (8k), Diya (6k), Rohan (10k), Ananya (5k) pass! Priya (May 26) & Kabir (Unverified) blocked.
+  assert.equal(fairStipend.filter((m) => m.hardFilterPassed).length, 4);
 });
 
-test('rankCandidates dynamically updates shortlist when stipend slider changes', () => {
-  const lowStipendReq = { ...DEFAULT_REQUIREMENT, stipendMonthly: 7000 };
-  const lowRanked = rankCandidates(INITIAL_STUDENTS, lowStipendReq, UP_UNIVERSITIES);
-  const passedLow = lowRanked.filter((r) => r.hardFilterPassed);
-  assert.equal(passedLow.length, 0); // Aarav needs 8k, Ananya/Rohan need 10k
-
-  const fairStipendReq = { ...DEFAULT_REQUIREMENT, stipendMonthly: 12000 };
-  const fairRanked = rankCandidates(INITIAL_STUDENTS, fairStipendReq, UP_UNIVERSITIES);
-  const passedFair = fairRanked.filter((r) => r.hardFilterPassed);
-  assert.ok(passedFair.length >= 3);
-  assert.equal(passedFair[0].student.id, 'stu-aarav');
-});
-
-test('getDisplayCandidateIdentity redacts name and college when blindMode is active', () => {
+test('getBlindSafeUniversityLabel returns University Hidden — Blind Mode when ON', () => {
   const aarav = INITIAL_STUDENTS[0];
-  const visible = getDisplayCandidateIdentity(aarav, false);
-  assert.equal(visible.displayName, 'Aarav Srivastava');
-  assert.equal(visible.isRedacted, false);
-
-  const blind = getDisplayCandidateIdentity(aarav, true);
-  assert.equal(blind.displayName, 'Candidate UP-Y2-104');
-  assert.equal(blind.isRedacted, true);
-  assert.ok(!blind.institutionLine.includes('IET Lucknow'));
+  assert.equal(getBlindSafeUniversityLabel(aarav, false), 'IET Lucknow');
+  assert.equal(
+    getBlindSafeUniversityLabel(aarav, true),
+    'University Hidden — Blind Mode'
+  );
 });
 
-test('computeSkillDistribution aggregates shortlisted vs constraint-blocked candidates per required skill', () => {
-  const ranked = rankCandidates(INITIAL_STUDENTS, DEFAULT_REQUIREMENT, UP_UNIVERSITIES);
-  const dist = computeSkillDistribution(ranked, DEFAULT_REQUIREMENT.requiredSkills);
-
-  assert.equal(dist.length, DEFAULT_REQUIREMENT.requiredSkills.length);
-  const pythonDatum = dist.find((d) => d.skill === 'Python')!;
-  // Aarav, Rohan, Ananya pass Stage 1 and have Python (3 shortlisted); Priya & Kabir are blocked by exam/T&P (2 blocked)
-  assert.equal(pythonDatum.shortlisted, 3);
-  assert.equal(pythonDatum.blocked, 2);
-  assert.equal(pythonDatum.total, 5);
-
-  const emptyDist = computeSkillDistribution(ranked, []);
-  assert.deepEqual(emptyDist, []);
+test('computeSkillDistribution counts shortlisted vs blocked students per required skill', () => {
+  const ranked = rankStudentsForOpening(
+    INITIAL_STUDENTS,
+    DEFAULT_OPENING,
+    UP_UNIVERSITIES
+  );
+  const dist = computeSkillDistribution(ranked, DEFAULT_OPENING.requiredSkills);
+  const pythonItem = dist.find((d) => d.skill === 'Python')!;
+  assert.equal(pythonItem.shortlisted, 4);
+  assert.equal(pythonItem.blocked, 2);
+  assert.equal(pythonItem.total, 6);
 });
-

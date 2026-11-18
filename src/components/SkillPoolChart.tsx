@@ -32,40 +32,40 @@ export const SkillPoolChart: React.FC<SkillPoolChartProps> = ({
   return (
     <div
       data-testid="skill-pool-chart"
-      className="rounded-xl border border-slate-200 bg-white px-5 py-4"
+      className="rounded-xl border border-[#27272A] bg-[#121216] px-5 py-4"
     >
       <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
-        <div className="flex items-center gap-1.5">
-          <BarChart3 className="h-3.5 w-3.5 text-blue-700" />
-          <h3 className="text-xs font-medium text-slate-800">
+        <div className="flex items-center gap-2">
+          <BarChart3 className="h-4 w-4 text-[#F97316]" />
+          <h3 className="text-xs font-semibold text-[#FAFAFA]">
             Tech Stack Pool Health
           </h3>
         </div>
 
-        <div className="flex flex-wrap items-center gap-4 text-[11px] text-slate-600">
+        <div className="flex flex-wrap items-center gap-4 text-[11px] text-[#A1A1AA]">
           <span className="inline-flex items-center gap-1.5">
             <span
               aria-hidden="true"
-              className="inline-block h-2.5 w-2.5 rounded-xs bg-blue-700"
+              className="inline-block h-2.5 w-2.5 rounded-xs bg-[#F97316]"
             />
             Shortlisted
           </span>
           <span className="inline-flex items-center gap-1.5">
             <span
               aria-hidden="true"
-              className="inline-block h-2.5 w-2.5 rounded-xs bg-slate-300"
+              className="inline-block h-2.5 w-2.5 rounded-xs bg-[#3F3F46]"
             />
             Blocked by Stage 1
           </span>
-          <span className="font-mono text-slate-500 tabular-nums">
+          <span className="font-mono text-[#A1A1AA] tabular-nums">
             Peak {maxSkillCoverage}/{totalPool} students
           </span>
         </div>
       </div>
 
       {data.length === 0 ? (
-        <div className="flex h-36 items-center justify-center rounded-lg bg-slate-50 text-xs text-slate-500">
-          Add comma-separated skills in Required Stack to visualize candidate pool coverage.
+        <div className="flex h-36 items-center justify-center rounded-lg bg-[#1C1C22] text-xs text-[#A1A1AA]">
+          Select or add skills on the left to inspect candidate pool distribution.
         </div>
       ) : (
         <div className="h-44 w-full" aria-label="Student skill match distribution bar chart">
@@ -78,30 +78,31 @@ export const SkillPoolChart: React.FC<SkillPoolChartProps> = ({
               <CartesianGrid
                 strokeDasharray="3 3"
                 vertical={false}
-                stroke="#E2E8F0"
+                stroke="#27272A"
               />
               <XAxis
                 dataKey="skill"
-                tick={{ fill: '#475569', fontSize: 12 }}
-                axisLine={{ stroke: '#CBD5E1' }}
+                tick={{ fill: '#A1A1AA', fontSize: 12 }}
+                axisLine={{ stroke: '#27272A' }}
                 tickLine={false}
               />
               <YAxis
                 allowDecimals={false}
                 domain={[0, Math.max(totalPool, 1)]}
-                tick={{ fill: '#64748B', fontSize: 11 }}
+                tick={{ fill: '#A1A1AA', fontSize: 11 }}
                 axisLine={false}
                 tickLine={false}
               />
               <Tooltip
-                cursor={{ fill: '#F8FAFC' }}
+                cursor={{ fill: '#1C1C22' }}
                 contentStyle={{
-                  backgroundColor: '#FFFFFF',
-                  borderColor: '#E2E8F0',
+                  backgroundColor: '#121216',
+                  borderColor: '#27272A',
                   borderRadius: '0.5rem',
                   fontSize: '12px',
-                  boxShadow: '0 4px 6px -1px rgba(15, 23, 42, 0.08)',
+                  color: '#FAFAFA',
                 }}
+                labelStyle={{ color: '#FAFAFA', fontWeight: 600 }}
                 formatter={(value, name) => [
                   `${value} student${Number(value) === 1 ? '' : 's'}`,
                   name === 'shortlisted' ? 'Shortlisted' : 'Blocked by Stage 1',
@@ -110,14 +111,14 @@ export const SkillPoolChart: React.FC<SkillPoolChartProps> = ({
               <Bar
                 dataKey="shortlisted"
                 stackId="pool"
-                fill="#1D4ED8"
+                fill="#F97316"
                 radius={[0, 0, 0, 0]}
                 isAnimationActive={false}
               />
               <Bar
                 dataKey="blocked"
                 stackId="pool"
-                fill="#CBD5E1"
+                fill="#3F3F46"
                 radius={[4, 4, 0, 0]}
                 isAnimationActive={false}
               />
